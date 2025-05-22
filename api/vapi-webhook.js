@@ -3,20 +3,29 @@ import OpenAI from 'openai';
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
 export default async function handler(req, res) {
-  console.log("Vapi webhook hit");
-
   if (req.method === 'POST') {
-    const event = req.body;
+    console.log("Webhook received:", req.body);
 
-    console.log("Received from Vapi:", event);
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [{ role: "user", content: "Say hello back" }],
+      });
 
-    // Simple response (can be replaced with GPT logic)
-    res.status(200).json({
-      type: 'text',
-      message: "Hi there! I'm your AI assistant. What can I help with?",
-    });
+      const reply = completion.choices[0].message.content;
+      console.log("GPT Reply:", reply);
+
+      res.status(200).json({
+        type: "text",
+        message: reply,
+      });
+    } catch (error) {
+      console.error("OpenAI error:", error);
+      res.status(500).json({ error: "Failed to call OpenAI" });
+    }
   } else {
-    res.status(405).send('Only POST requests are supported.');
+    res.status(405).send("Only POST requests are supported.");
   }
 }
