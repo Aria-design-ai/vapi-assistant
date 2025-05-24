@@ -11,8 +11,8 @@ export default async function handler(req, res) {
     console.log("Incoming Vapi event:", event);
 
     try {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4", // or "gpt-3.5-turbo"
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4",
         messages: [
           {
             role: "system",
@@ -23,17 +23,25 @@ export default async function handler(req, res) {
             content: event?.transcript || "Hello!",
           },
         ],
+        stream: true,
       });
 
-      const reply = completion.choices[0].message.content;
-
-      res.status(200).json({
-        type: 'text',
-        message: reply,
+      res.writeHead(200, {
+        'Content-Type': 'text/plain',
+        'Transfer-Encoding': 'chunked',
       });
+
+      for await (const chunk of stream) {
+        const token = chunk.choices?.[0]?.delta?.content || '';
+        if (token) {
+          res.write(token);
+        }
+      }
+
+      res.end();
     } catch (error) {
-      console.error("OpenAI error:", error);
-      res.status(500).json({ error: "OpenAI error" });
+      console.error("OpenAI streaming error:", error);
+      res.status(500).json({ error: "OpenAI streaming error" });
     }
   } else {
     res.status(405).send('Only POST requests are supported.');
