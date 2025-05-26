@@ -1,3 +1,4 @@
+console.log("✅ Webhook called!", req.method, req.body);
 export const config = {
   runtime: 'edge',
 };
