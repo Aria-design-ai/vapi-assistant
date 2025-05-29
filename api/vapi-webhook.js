@@ -2,6 +2,19 @@ export const config = {
   runtime: 'edge',
 };
 
+// Handles CORS preflight
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+}
+
+// Main POST handler
 export async function POST(req) {
   try {
     const { messages, session_id } = await req.json();
@@ -70,15 +83,4 @@ export async function POST(req) {
     console.error('❌ Server error:', error);
     return new Response('Internal Server Error', { status: 500 });
   }
-}
-
-export async function OPTIONS() {
-  return new Response(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
 }
