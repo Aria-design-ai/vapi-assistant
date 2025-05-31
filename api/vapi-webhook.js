@@ -31,10 +31,13 @@ export async function POST(req: Request): Promise<Response> {
             'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
           },
           body: JSON.stringify({
-            model: 'gpt-4',
-            messages,
-            stream: true,
-          }),
+  model: 'gpt-4',
+  messages: [
+    { role: 'system', content: 'You are a friendly assistant who responds to the user’s queries clearly and conversationally. If the user asks for a joke or fun fact, provide a humorous or interesting response.' },
+    ...messages
+  ],
+  stream: true,
+}),
         });
 
         const reader = response.body!.getReader();
