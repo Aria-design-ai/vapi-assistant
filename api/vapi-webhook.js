@@ -60,6 +60,8 @@ export async function POST(req: Request): Promise<Response> {
                 const parsed = JSON.parse(data);
                 const content = parsed.choices?.[0]?.delta?.content;
                 if (content) {
+                  console.log('Chunk:', content);
+                  
                   const payload = `event: message\ndata: ${JSON.stringify({ type: 'text', message: content })}\n\n`;
                   controller.enqueue(encoder.encode(payload));
                 }
