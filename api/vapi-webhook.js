@@ -2,22 +2,24 @@ export const config = {
   runtime: 'edge',
 };
 
-// Handles CORS preflight
-export async function OPTIONS() {
-  return new Response(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
-}
-
 // Main POST handler
-export async function POST(req) {
+export async function POST(req: Request): Promise<Response> {
   try {
-    const { messages, session_id } = await req.json();
+    const raw = await req.json();
+    let { messages, session_id } = raw;
+
+    // Ensure messages is an array
+    if (!messages || !Array.isArray(messages)) {
+      messages = [];
+    }
+
+    // Inject system prompt if not present
+    if (!messages.find((m: any) => m.role === 'system')) {
+      messages.unshift({
+        role: 'system',
+        content: 'You are a helpful voice assistant.',
+      });
+    }
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -35,7 +37,7 @@ export async function POST(req) {
           }),
         });
 
-        const reader = response.body.getReader();
+        const reader = response.body!.getReader();
         const decoder = new TextDecoder('utf-8');
 
         while (true) {
@@ -79,6 +81,7 @@ export async function POST(req) {
         'Access-Control-Allow-Headers': 'Content-Type',
       },
     });
+
   } catch (error) {
     console.error('❌ Server error:', error);
     return new Response('Internal Server Error', { status: 500 });
