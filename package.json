@@ -1,4 +1,6 @@
 {
+  "name": "vapi-webhook",
+  "version": "1.0.0",
   "dependencies": {
     "resend": "^0.8.0"
   }
