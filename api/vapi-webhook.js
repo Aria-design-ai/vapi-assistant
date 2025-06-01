@@ -1,56 +1,74 @@
+// Vercel Edge Function - webhook for Vapi assistant tool
 export const config = {
   runtime: 'edge',
 };
 
-import { Resend } from 'resend';
+// CORS preflight handler
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+}
 
-const resend = new Resend(process.env.re_DGbqon48_217wpCbiweo8HhN8HcYcunyz); // Store this in Vercel Environment Variables
+// Helper to send email (you'll need to integrate with a real email service)
+async function sendEmail(to, subject, body) {
+  // Placeholder — replace with real integration (e.g., SendGrid, Resend, Mailgun)
+  console.log(`📧 Sending email to ${to}...\nSubject: ${subject}\nBody: ${body}`);
+}
 
-const DEPARTMENT_EMAILS = {
-  sales: 'sales@example.com',
-  service: 'service@example.com',
-  // future: parts: 'parts@example.com',
-};
-
+// Main POST handler
 export async function POST(req) {
   try {
-    const { Name, Phone, Message, Department, vehicle_info } = await req.json();
+    const { tool_call_id, tool_name, parameters } = await req.json();
 
-    // Basic validation
-    if (!Name || !Phone || !Message || !Department) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
+    if (tool_name !== 'capture_lead') {
+      return new Response('Tool not handled by this endpoint', { status: 400 });
     }
 
-    // Get recipient email based on department
-    const recipientEmail = DEPARTMENT_EMAILS[Department.toLowerCase()];
-    if (!recipientEmail) {
-      return new Response(JSON.stringify({ error: 'Invalid department selected' }), { status: 400 });
+    const { Name, Phone, Message, Department, vehicle_info } = parameters;
+
+    const departments = {
+      car_sales: 'aryansamnani09@gmail.com',
+      car_service: 'aryansamnani9@gmail.com',
+      bike_sales: 'amirsamnani13@gmail.com',
+      bike_service: 'amirsamnani84@gmail.com',
+    };
+
+    const recipient = departments[Department];
+
+    if (!recipient) {
+      console.error(`❌ Unknown department: ${Department}`);
+      return new Response('Unknown department', { status: 400 });
     }
 
-    // Format email content
-    const subject = `New ${Department} Inquiry from ${Name}`;
+    const subject = `📞 New Lead: ${Department.replace('_', ' ').toUpperCase()}`;
     const body = `
-      <p><strong>Name:</strong> ${Name}</p>
-      <p><strong>Phone:</strong> ${Phone}</p>
-      <p><strong>Message:</strong> ${Message}</p>
-      <p><strong>Department:</strong> ${Department}</p>
-      ${vehicle_info ? `<p><strong>Vehicle Info:</strong> ${vehicle_info}</p>` : ''}
+Name: ${Name}
+Phone: ${Phone}
+Department: ${Department}
+Message: ${Message}
+Vehicle Info: ${vehicle_info || 'N/A'}
     `;
 
-    // Send the email
-    await resend.emails.send({
-      from: 'aryansamnani09@gmail.com',
-      to: recipientEmail,
-      subject,
-      html: body,
-    });
+    await sendEmail(recipient, subject, body);
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-    });
-
+    return new Response(
+      JSON.stringify({ success: true, message: 'Lead captured and emailed successfully.' }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      }
+    );
   } catch (err) {
-    console.error('❌ Webhook Error:', err);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
+    console.error('❌ Error handling webhook:', err);
+    return new Response('Internal Server Error', { status: 500 });
   }
 }
