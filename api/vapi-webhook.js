@@ -4,7 +4,7 @@ export const config = {
 
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY); // Store this in Vercel Environment Variables
+const resend = new Resend(process.env.re_DGbqon48_217wpCbiweo8HhN8HcYcunyz); // Store this in Vercel Environment Variables
 
 const DEPARTMENT_EMAILS = {
   sales: 'sales@example.com',
@@ -39,7 +39,7 @@ export async function POST(req) {
 
     // Send the email
     await resend.emails.send({
-      from: 'reception@yourdomain.com',
+      from: 'aryansamnani09@gmail.com',
       to: recipientEmail,
       subject,
       html: body,
