@@ -1,74 +1,61 @@
-// Vercel Edge Function - webhook for Vapi assistant tool
-export const config = {
-  runtime: 'edge',
+import { NextResponse } from "next/server";
+import { Resend } from "resend";
+
+// Initialize Resend with your API key (store this securely)
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+const departmentEmails = {
+  car_sales: "aryansamnani09@gmail.com",
+  car_service: "aryansamnani9@gmail.com",
+  bike_sales: "amirsamnani13@gmail.com",
+  bike_service: "amirsamnani84@gmail.com",
 };
 
-// CORS preflight handler
-export async function OPTIONS() {
-  return new Response(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
-}
-
-// Helper to send email (you'll need to integrate with a real email service)
-async function sendEmail(to, subject, body) {
-  // Placeholder — replace with real integration (e.g., SendGrid, Resend, Mailgun)
-  console.log(`📧 Sending email to ${to}...\nSubject: ${subject}\nBody: ${body}`);
-}
-
-// Main POST handler
 export async function POST(req) {
   try {
-    const { tool_call_id, tool_name, parameters } = await req.json();
+    const body = await req.json();
 
-    if (tool_name !== 'capture_lead') {
-      return new Response('Tool not handled by this endpoint', { status: 400 });
+    const toolCall = body.toolCalls?.[0];
+    const name = toolCall?.args?.name;
+    const phone = toolCall?.args?.phone;
+    const message = toolCall?.args?.message;
+    const department = toolCall?.args?.department;
+    const vehicle_info = toolCall?.args?.vehicle_info || "Not provided";
+
+    if (!name || !phone || !message || !department) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const { Name, Phone, Message, Department, vehicle_info } = parameters;
+    const toEmail = departmentEmails[department];
 
-    const departments = {
-      car_sales: 'aryansamnani09@gmail.com',
-      car_service: 'aryansamnani9@gmail.com',
-      bike_sales: 'amirsamnani13@gmail.com',
-      bike_service: 'amirsamnani84@gmail.com',
-    };
-
-    const recipient = departments[Department];
-
-    if (!recipient) {
-      console.error(`❌ Unknown department: ${Department}`);
-      return new Response('Unknown department', { status: 400 });
+    if (!toEmail) {
+      return NextResponse.json({ error: "Invalid department" }, { status: 400 });
     }
 
-    const subject = `📞 New Lead: ${Department.replace('_', ' ').toUpperCase()}`;
-    const body = `
-Name: ${Name}
-Phone: ${Phone}
-Department: ${Department}
-Message: ${Message}
-Vehicle Info: ${vehicle_info || 'N/A'}
+    const emailSubject = `New ${department.replace("_", " ").toUpperCase()} Lead`;
+    const emailBody = `
+      <p><strong>Name:</strong> ${name}</p>
+      <p><strong>Phone:</strong> ${phone}</p>
+      <p><strong>Message:</strong> ${message}</p>
+      <p><strong>Vehicle Info:</strong> ${vehicle_info}</p>
+      <p><strong>Department:</strong> ${department}</p>
     `;
 
-    await sendEmail(recipient, subject, body);
+    const { data, error } = await resend.emails.send({
+      from: "Aria <aria@unidubstudios.com>",
+      to: [toEmail],
+      subject: emailSubject,
+      html: emailBody,
+    });
 
-    return new Response(
-      JSON.stringify({ success: true, message: 'Lead captured and emailed successfully.' }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      }
-    );
+    if (error) {
+      console.error("Resend email error:", error);
+      return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, emailId: data.id });
   } catch (err) {
-    console.error('❌ Error handling webhook:', err);
-    return new Response('Internal Server Error', { status: 500 });
+    console.error("Webhook error:", err);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
