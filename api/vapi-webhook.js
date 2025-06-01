@@ -17,12 +17,9 @@ export async function OPTIONS() {
 // Main POST handler
 export async function POST(req) {
   try {
-    const body = await req.json();
-    const messages = Array.isArray(body.messages) ? body.messages : [];
-    const session_id = body.session_id;
+    const { messages, session_id } = await req.json();
 
     const encoder = new TextEncoder();
-
     const stream = new ReadableStream({
       async start(controller) {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -33,14 +30,7 @@ export async function POST(req) {
           },
           body: JSON.stringify({
             model: 'gpt-4',
-            messages: [
-              {
-                role: 'system',
-                content:
-                  'You are a helpful, friendly voice assistant. Keep responses short and conversational. Respond with jokes or fun facts if asked, and always speak clearly and engagingly.',
-              },
-              ...messages,
-            ],
+            messages,
             stream: true,
           }),
         });
@@ -58,35 +48,28 @@ export async function POST(req) {
           for (const line of lines) {
             if (line.startsWith('data:')) {
               const data = line.replace('data: ', '');
+
               if (data === '[DONE]') {
                 controller.enqueue(encoder.encode('event: done\ndata: {}\n\n'));
                 controller.close();
                 return;
               }
 
+              let parsed;
               try {
-                let parsed;
-try {
-  parsed = JSON.parse(data);
-} catch (err) {
-  console.error('❌ JSON parse error:', err, '\nOffending data:\n', data);
-  continue; // skip this line if parsing fails
-}
-
-const content = parsed?.choices?.[0]?.delta?.content;
-if (content) {
-  const payload = `event: message\ndata: ${JSON.stringify({ type: 'text', message: content })}\n\n`;
-  controller.enqueue(encoder.encode(payload));
-}
-                if (content) {
-                  const payload = `event: message\ndata: ${JSON.stringify({
-                    type: 'text',
-                    message: content,
-                  })}\n\n`;
-                  controller.enqueue(encoder.encode(payload));
-                }
+                parsed = JSON.parse(data);
               } catch (err) {
-                console.error('❌ Parse error:', err);
+                console.error('❌ JSON parse error:', err, '\nOffending data:\n', data);
+                continue; // skip malformed chunks
+              }
+
+              const content = parsed?.choices?.[0]?.delta?.content;
+              if (content) {
+                const payload = `event: message\ndata: ${JSON.stringify({
+                  type: 'text',
+                  message: content,
+                })}\n\n`;
+                controller.enqueue(encoder.encode(payload));
               }
             }
           }
