@@ -2,91 +2,55 @@ export const config = {
   runtime: 'edge',
 };
 
-// CORS preflight handler
-export async function OPTIONS() {
-  return new Response(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
-}
+import { Resend } from 'resend';
 
-// Main webhook POST handler
+const resend = new Resend(process.env.RESEND_API_KEY); // Store this in Vercel Environment Variables
+
+const DEPARTMENT_EMAILS = {
+  sales: 'sales@example.com',
+  service: 'service@example.com',
+  // future: parts: 'parts@example.com',
+};
+
 export async function POST(req) {
   try {
-    const { messages, session_id } = await req.json();
+    const { Name, Phone, Message, Department, vehicle_info } = await req.json();
 
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: 'gpt-4',
-            messages,
-            stream: true,
-          }),
-        });
+    // Basic validation
+    if (!Name || !Phone || !Message || !Department) {
+      return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
+    }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
+    // Get recipient email based on department
+    const recipientEmail = DEPARTMENT_EMAILS[Department.toLowerCase()];
+    if (!recipientEmail) {
+      return new Response(JSON.stringify({ error: 'Invalid department selected' }), { status: 400 });
+    }
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+    // Format email content
+    const subject = `New ${Department} Inquiry from ${Name}`;
+    const body = `
+      <p><strong>Name:</strong> ${Name}</p>
+      <p><strong>Phone:</strong> ${Phone}</p>
+      <p><strong>Message:</strong> ${Message}</p>
+      <p><strong>Department:</strong> ${Department}</p>
+      ${vehicle_info ? `<p><strong>Vehicle Info:</strong> ${vehicle_info}</p>` : ''}
+    `;
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n').filter(line => line.trim() !== '');
-
-          for (const line of lines) {
-            if (line.startsWith('data:')) {
-              const data = line.replace('data: ', '');
-              if (data === '[DONE]') {
-                controller.enqueue(encoder.encode('event: done\ndata: {}\n\n'));
-                controller.close();
-                return;
-              }
-
-              try {
-                if (data && data.trim().startsWith('{')) {
-                  const parsed = JSON.parse(data);
-                  const content = parsed.choices?.[0]?.delta?.content;
-
-                  if (content) {
-                    const payload = `event: message\ndata: ${JSON.stringify({
-                      type: 'text',
-                      message: content,
-                    })}\n\n`;
-                    controller.enqueue(encoder.encode(payload));
-                  }
-                }
-              } catch (err) {
-                console.error('❌ Safe parse error:', err, '\nOffending data:', data);
-              }
-            }
-          }
-        }
-      },
+    // Send the email
+    await resend.emails.send({
+      from: 'reception@yourdomain.com',
+      to: recipientEmail,
+      subject,
+      html: body,
     });
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
     });
-  } catch (error) {
-    console.error('❌ Server error:', error);
-    return new Response('Internal Server Error', { status: 500 });
+
+  } catch (err) {
+    console.error('❌ Webhook Error:', err);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
   }
 }
