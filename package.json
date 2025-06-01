@@ -1,6 +1,12 @@
 {
   "name": "vapi-webhook",
   "version": "1.0.0",
+  "type": "module",
+  "main": "api/vapi-webhook.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "node api/vapi-webhook.js"
+  },
   "dependencies": {
     "resend": "^0.8.0"
   }
