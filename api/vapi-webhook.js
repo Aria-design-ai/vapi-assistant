@@ -65,8 +65,19 @@ export async function POST(req) {
               }
 
               try {
-                const parsed = JSON.parse(data);
-                const content = parsed.choices?.[0]?.delta?.content;
+                let parsed;
+try {
+  parsed = JSON.parse(data);
+} catch (err) {
+  console.error('❌ JSON parse error:', err, '\nOffending data:\n', data);
+  continue; // skip this line if parsing fails
+}
+
+const content = parsed?.choices?.[0]?.delta?.content;
+if (content) {
+  const payload = `event: message\ndata: ${JSON.stringify({ type: 'text', message: content })}\n\n`;
+  controller.enqueue(encoder.encode(payload));
+}
                 if (content) {
                   const payload = `event: message\ndata: ${JSON.stringify({
                     type: 'text',
