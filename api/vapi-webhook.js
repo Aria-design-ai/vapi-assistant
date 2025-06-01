@@ -17,7 +17,9 @@ export async function OPTIONS() {
 // Main POST handler
 export async function POST(req) {
   try {
-    const { messages, session_id } = await req.json();
+    const body = await req.json();
+    const messages = Array.isArray(body.messages) ? body.messages : [];
+    const session_id = body.session_id;
 
     const encoder = new TextEncoder();
 
