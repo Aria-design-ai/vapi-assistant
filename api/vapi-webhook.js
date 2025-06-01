@@ -2,7 +2,7 @@ export const config = {
   runtime: 'edge',
 };
 
-// CORS Preflight Handler
+// CORS preflight handler
 export async function OPTIONS() {
   return new Response(null, {
     status: 200,
@@ -14,21 +14,12 @@ export async function OPTIONS() {
   });
 }
 
-// Main POST Handler
+// Main webhook POST handler
 export async function POST(req) {
   try {
-    const { messages: incomingMessages = [], session_id } = await req.json();
-
-    const messages = [
-      {
-        role: 'system',
-        content: 'You are a helpful voice assistant. Respond clearly, naturally, and conversationally.',
-      },
-      ...incomingMessages,
-    ];
+    const { messages, session_id } = await req.json();
 
     const encoder = new TextEncoder();
-
     const stream = new ReadableStream({
       async start(controller) {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -64,18 +55,20 @@ export async function POST(req) {
               }
 
               try {
-                const parsed = JSON.parse(data);
-                const content = parsed.choices?.[0]?.delta?.content;
+                if (data && data.trim().startsWith('{')) {
+                  const parsed = JSON.parse(data);
+                  const content = parsed.choices?.[0]?.delta?.content;
 
-                if (content) {
-                  const payload = `event: message\ndata: ${JSON.stringify({
-                    type: 'text',
-                    message: content,
-                  })}\n\n`;
-                  controller.enqueue(encoder.encode(payload));
+                  if (content) {
+                    const payload = `event: message\ndata: ${JSON.stringify({
+                      type: 'text',
+                      message: content,
+                    })}\n\n`;
+                    controller.enqueue(encoder.encode(payload));
+                  }
                 }
               } catch (err) {
-                console.error('❌ Parse error:', err);
+                console.error('❌ Safe parse error:', err, '\nOffending data:', data);
               }
             }
           }
