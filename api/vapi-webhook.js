@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server";
-import { Resend } from "resend";
+const { Resend } = require("resend");
 
-// Initialize Resend with your API key (store this securely)
+// Initialize Resend with your API key
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const departmentEmails = {
@@ -11,9 +10,13 @@ const departmentEmails = {
   bike_service: "amirsamnani84@gmail.com",
 };
 
-export async function POST(req) {
+module.exports = async (req, res) => {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
   try {
-    const body = await req.json();
+    const body = req.body;
 
     const toolCall = body.toolCalls?.[0];
     const name = toolCall?.args?.name;
@@ -23,13 +26,12 @@ export async function POST(req) {
     const vehicle_info = toolCall?.args?.vehicle_info || "Not provided";
 
     if (!name || !phone || !message || !department) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return res.status(400).json({ error: "Missing required fields" });
     }
 
     const toEmail = departmentEmails[department];
-
     if (!toEmail) {
-      return NextResponse.json({ error: "Invalid department" }, { status: 400 });
+      return res.status(400).json({ error: "Invalid department" });
     }
 
     const emailSubject = `New ${department.replace("_", " ").toUpperCase()} Lead`;
@@ -50,12 +52,12 @@ export async function POST(req) {
 
     if (error) {
       console.error("Resend email error:", error);
-      return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
+      return res.status(500).json({ error: "Failed to send email" });
     }
 
-    return NextResponse.json({ success: true, emailId: data.id });
+    res.status(200).json({ success: true, emailId: data.id });
   } catch (err) {
     console.error("Webhook error:", err);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    res.status(500).json({ error: "Internal Server Error" });
   }
-}
+};
