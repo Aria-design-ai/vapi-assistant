@@ -2,26 +2,25 @@ export const config = {
   runtime: 'edge',
 };
 
+// Handles CORS preflight
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+}
+
 // Main POST handler
-export async function POST(req: Request): Promise<Response> {
+export async function POST(req) {
   try {
-    const raw = await req.json();
-    let { messages, session_id } = raw;
-
-    // Ensure messages is an array
-    if (!messages || !Array.isArray(messages)) {
-      messages = [];
-    }
-
-    // Inject system prompt if not present
-    if (!messages.find((m: any) => m.role === 'system')) {
-      messages.unshift({
-        role: 'system',
-        content: 'You are a helpful voice assistant.',
-      });
-    }
+    const { messages, session_id } = await req.json();
 
     const encoder = new TextEncoder();
+
     const stream = new ReadableStream({
       async start(controller) {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -31,16 +30,20 @@ export async function POST(req: Request): Promise<Response> {
             'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
           },
           body: JSON.stringify({
-  model: 'gpt-4',
-  messages: [
-    { role: 'system', content: 'You are a friendly assistant who responds to the user’s queries clearly and conversationally. If the user asks for a joke or fun fact, provide a humorous or interesting response.' },
-    ...messages
-  ],
-  stream: true,
-}),
+            model: 'gpt-4',
+            messages: [
+              {
+                role: 'system',
+                content:
+                  'You are a helpful, friendly voice assistant. Keep responses short and conversational. Respond with jokes or fun facts if asked, and always speak clearly and engagingly.',
+              },
+              ...messages,
+            ],
+            stream: true,
+          }),
         });
 
-        const reader = response.body!.getReader();
+        const reader = response.body.getReader();
         const decoder = new TextDecoder('utf-8');
 
         while (true) {
@@ -63,9 +66,10 @@ export async function POST(req: Request): Promise<Response> {
                 const parsed = JSON.parse(data);
                 const content = parsed.choices?.[0]?.delta?.content;
                 if (content) {
-                  console.log('Chunk:', content);
-                  
-                  const payload = `event: message\ndata: ${JSON.stringify({ type: 'text', message: content })}\n\n`;
+                  const payload = `event: message\ndata: ${JSON.stringify({
+                    type: 'text',
+                    message: content,
+                  })}\n\n`;
                   controller.enqueue(encoder.encode(payload));
                 }
               } catch (err) {
@@ -86,7 +90,6 @@ export async function POST(req: Request): Promise<Response> {
         'Access-Control-Allow-Headers': 'Content-Type',
       },
     });
-
   } catch (error) {
     console.error('❌ Server error:', error);
     return new Response('Internal Server Error', { status: 500 });
