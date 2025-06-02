@@ -18,11 +18,10 @@ export default async function handler(req, res) {
   try {
     const body = req.body;
     console.log("Incoming request body:", body);
+    console.log("Tool call object:", body.toolCalls?.[0]);
     
     const toolCall = body.toolCalls?.[0];
-    console.log("Tool call object:", toolCall);
-
-    const toolCall = body.toolCalls?.[0];
+    
     const name = toolCall?.args?.name;
     const phone = toolCall?.args?.phone;
     const message = toolCall?.args?.message;
