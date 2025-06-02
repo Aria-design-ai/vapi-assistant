@@ -16,17 +16,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = req.body.message;
+    const body = req.body;
     console.log("Incoming request body:", body);
-    console.log("Tool call object:", body.toolCalls?.[0]);
 
     const toolCall = body.toolCalls?.[0];
+    console.log("Tool call object:", toolCall);
 
-    const name = toolCall?.args?.name;
-    const phone = toolCall?.args?.phone;
-    const message = toolCall?.args?.message;
-    const department = toolCall?.args?.department;
-    const vehicle_info = toolCall?.args?.vehicle_info || "Not provided";
+    const args = toolCall?.function?.arguments || {};
+
+    const name = args.Name || args.name;
+    const phone = args.Phone || args.phone;
+    const message = args.Message || args.message;
+    const department = args.Department || args.department;
+    const vehicle_info = args.vehicle_info || "Not provided";
 
     if (!name || !phone || !message || !department) {
       return res.status(400).json({ error: "Missing required fields" });
