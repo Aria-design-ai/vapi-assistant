@@ -1,4 +1,4 @@
-const { Resend } = require("resend");
+import { Resend } from "resend";
 
 // Initialize Resend with your API key
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -10,7 +10,7 @@ const departmentEmails = {
   bike_service: "amirsamnani84@gmail.com",
 };
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -60,4 +60,4 @@ module.exports = async (req, res) => {
     console.error("Webhook error:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
-};
+}
