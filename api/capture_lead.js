@@ -1,10 +1,10 @@
 import { Resend } from "resend";
 import { z } from "zod";
 
-// Initialize Resend
+// Initialize Resend with your API key
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Define department to email mapping
+// Email mapping by department
 const departmentEmails = {
   car_sales: "aryansamnani09@gmail.com",
   car_service: "aryansamnani9@gmail.com",
@@ -28,35 +28,41 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body;
-    console.log("Incoming body:", JSON.stringify(body, null, 2));
+    console.log("📥 Raw request body:", JSON.stringify(body, null, 2));
 
     const toolCall = body.toolCalls?.[0];
-    if (!toolCall) {
-      return res.status(400).json({ error: "Missing toolCalls[0]" });
-    }
+    console.log("🔧 toolCalls[0]:", JSON.stringify(toolCall, null, 2));
 
-    const rawArgs = toolCall.function?.arguments;
+    const rawArgs = toolCall?.function?.arguments;
+    console.log("📦 Raw arguments:", rawArgs);
+
     if (!rawArgs) {
       return res.status(400).json({ error: "Missing function.arguments" });
     }
 
-    // Handle both object and stringified object
+    // Parse arguments if needed
     let args;
     try {
       args = typeof rawArgs === "string" ? JSON.parse(rawArgs) : rawArgs;
+      console.log("✅ Parsed arguments:", args);
     } catch (e) {
+      console.error("❌ Failed to parse arguments:", e.message);
       return res.status(400).json({ error: "Invalid JSON in arguments" });
     }
 
+    // Validate with Zod
     const parsed = captureLeadSchema.safeParse(args);
     if (!parsed.success) {
-      console.error("Zod validation failed:", parsed.error.format());
+      console.error("❌ Zod validation error:", parsed.error.format());
       return res.status(400).json({ error: "Invalid tool arguments", details: parsed.error.format() });
     }
+
+    console.log("✅ Zod validation successful");
 
     const { Name, Phone, Message, Department, vehicle_info = "Not provided" } = parsed.data;
 
     const toEmail = departmentEmails[Department];
+
     const emailSubject = `New ${Department.replace("_", " ").toUpperCase()} Lead`;
     const emailBody = `
       <p><strong>Name:</strong> ${Name}</p>
@@ -74,13 +80,14 @@ export default async function handler(req, res) {
     });
 
     if (error) {
-      console.error("Resend error:", error);
+      console.error("❌ Resend email error:", error);
       return res.status(500).json({ error: "Failed to send email" });
     }
 
-    res.status(200).json({ success: true, emailId: data.id });
+    console.log("✅ Email sent. ID:", data.id);
+    return res.status(200).json({ success: true, emailId: data.id });
   } catch (err) {
-    console.error("Unhandled error:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error("💥 Unexpected error:", err);
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 }
