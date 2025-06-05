@@ -4,7 +4,7 @@ import { z } from "zod";
 // Initialize Resend with your API key
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Define allowed departments and their email mappings
+// Email mapping for departments
 const departmentEmails = {
   car_sales: "aryansamnani09@gmail.com",
   car_service: "aryansamnani9@gmail.com",
@@ -12,7 +12,7 @@ const departmentEmails = {
   bike_service: "amirsamnani84@gmail.com",
 };
 
-// Define a Zod schema for validating incoming tool arguments
+// Define the schema
 const captureLeadSchema = z.object({
   Name: z.string().min(1, "Name is required"),
   Phone: z.string().min(1, "Phone is required"),
@@ -27,20 +27,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = req.body;
-    console.log("Incoming request body:", body);
+    const toolCall = req.body?.toolCalls?.[0];
+    const rawArgs = toolCall?.function?.arguments;
 
-    const toolCall = body.toolCalls?.[0];
-    console.log("Tool call object:", toolCall);
-
-    const args = toolCall?.function?.arguments;
-
-    if (!args) {
+    if (!rawArgs) {
       return res.status(400).json({ error: "No arguments provided in tool call" });
     }
 
-    // Validate arguments with Zod
-    const parsed = captureLeadSchema.safeParse(args);
+    // Fix: Parse arguments string if needed
+    const parsedArgs = typeof rawArgs === "string" ? JSON.parse(rawArgs) : rawArgs;
+
+    // Validate
+    const parsed = captureLeadSchema.safeParse(parsedArgs);
 
     if (!parsed.success) {
       console.error("❌ Zod validation error:", parsed.error.format());
