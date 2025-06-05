@@ -1,10 +1,10 @@
 import { Resend } from "resend";
 import { z } from "zod";
 
-// Initialize Resend with your API key
+// Initialize Resend
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Email mapping for departments
+// Department email mapping
 const departmentEmails = {
   car_sales: "aryansamnani09@gmail.com",
   car_service: "aryansamnani9@gmail.com",
@@ -12,11 +12,11 @@ const departmentEmails = {
   bike_service: "amirsamnani84@gmail.com",
 };
 
-// Define the schema
+// Zod schema
 const captureLeadSchema = z.object({
-  Name: z.string().min(1, "Name is required"),
-  Phone: z.string().min(1, "Phone is required"),
-  Message: z.string().min(1, "Message is required"),
+  Name: z.string().min(1),
+  Phone: z.string().min(1),
+  Message: z.string().min(1),
   Department: z.enum(["car_sales", "car_service", "bike_sales", "bike_service"]),
   vehicle_info: z.string().optional(),
 });
@@ -27,18 +27,24 @@ export default async function handler(req, res) {
   }
 
   try {
-    const toolCall = req.body?.toolCalls?.[0];
-    const rawArgs = toolCall?.function?.arguments;
+    console.log("➡️ Incoming body:", req.body);
 
-    if (!rawArgs) {
-      return res.status(400).json({ error: "No arguments provided in tool call" });
+    const toolCall = req.body?.toolCalls?.[0];
+    let rawArgs = toolCall?.function?.arguments;
+
+    console.log("🧩 Raw arguments:", rawArgs);
+
+    // Attempt to parse stringified arguments if needed
+    let args;
+    try {
+      args = typeof rawArgs === "string" ? JSON.parse(rawArgs) : rawArgs;
+    } catch (e) {
+      console.error("❌ Failed to parse arguments:", e);
+      return res.status(400).json({ error: "Invalid JSON in arguments" });
     }
 
-    // Fix: Parse arguments string if needed
-    const parsedArgs = typeof rawArgs === "string" ? JSON.parse(rawArgs) : rawArgs;
-
-    // Validate
-    const parsed = captureLeadSchema.safeParse(parsedArgs);
+    // Validate using Zod
+    const parsed = captureLeadSchema.safeParse(args);
 
     if (!parsed.success) {
       console.error("❌ Zod validation error:", parsed.error.format());
@@ -48,8 +54,8 @@ export default async function handler(req, res) {
     const { Name, Phone, Message, Department, vehicle_info = "Not provided" } = parsed.data;
 
     const toEmail = departmentEmails[Department];
-    const emailSubject = `New ${Department.replace("_", " ").toUpperCase()} Lead`;
-    const emailBody = `
+    const subject = `New ${Department.replace("_", " ").toUpperCase()} Lead`;
+    const html = `
       <p><strong>Name:</strong> ${Name}</p>
       <p><strong>Phone:</strong> ${Phone}</p>
       <p><strong>Message:</strong> ${Message}</p>
@@ -60,18 +66,18 @@ export default async function handler(req, res) {
     const { data, error } = await resend.emails.send({
       from: "Aria <aria@unidubstudios.com>",
       to: [toEmail],
-      subject: emailSubject,
-      html: emailBody,
+      subject,
+      html,
     });
 
     if (error) {
-      console.error("Resend email error:", error);
+      console.error("❌ Resend email error:", error);
       return res.status(500).json({ error: "Failed to send email" });
     }
 
-    res.status(200).json({ success: true, emailId: data.id });
+    return res.status(200).json({ success: true, emailId: data.id });
   } catch (err) {
-    console.error("Webhook error:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error("❌ Unexpected error:", err);
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 }
