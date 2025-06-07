@@ -1,10 +1,8 @@
 import { Resend } from "resend";
 import { z } from "zod";
 
-// Initialize Resend with your API key
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Email mapping by department
 const departmentEmails = {
   car_sales: "aryansamnani09@gmail.com",
   car_service: "aryansamnani9@gmail.com",
@@ -12,7 +10,6 @@ const departmentEmails = {
   bike_service: "amirsamnani84@gmail.com",
 };
 
-// Zod schema for validation
 const captureLeadSchema = z.object({
   Name: z.string().min(1, "Name is required"),
   Phone: z.string().min(1, "Phone is required"),
@@ -27,8 +24,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = req.body;
-    console.log("📥 Raw request body:", JSON.stringify(body, null, 2));
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+
+    console.log("✅ Full req.body:", JSON.stringify(body, null, 2));
 
     const toolCall = body.toolCalls?.[0];
     console.log("🔧 toolCalls[0]:", JSON.stringify(toolCall, null, 2));
@@ -40,7 +38,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing function.arguments" });
     }
 
-    // Parse arguments if needed
     let args;
     try {
       args = typeof rawArgs === "string" ? JSON.parse(rawArgs) : rawArgs;
@@ -50,7 +47,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid JSON in arguments" });
     }
 
-    // Validate with Zod
     const parsed = captureLeadSchema.safeParse(args);
     if (!parsed.success) {
       console.error("❌ Zod validation error:", parsed.error.format());
@@ -60,7 +56,6 @@ export default async function handler(req, res) {
     console.log("✅ Zod validation successful");
 
     const { Name, Phone, Message, Department, vehicle_info = "Not provided" } = parsed.data;
-
     const toEmail = departmentEmails[Department];
 
     const emailSubject = `New ${Department.replace("_", " ").toUpperCase()} Lead`;
@@ -86,6 +81,7 @@ export default async function handler(req, res) {
 
     console.log("✅ Email sent. ID:", data.id);
     return res.status(200).json({ success: true, emailId: data.id });
+
   } catch (err) {
     console.error("💥 Unexpected error:", err);
     return res.status(500).json({ error: "Internal Server Error" });
