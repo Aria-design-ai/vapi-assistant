@@ -1,8 +1,10 @@
 import { Resend } from "resend";
 import { z } from "zod";
 
+// Initialize Resend with your API key
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// Department email mapping
 const departmentEmails = {
   car_sales: "aryansamnani09@gmail.com",
   car_service: "aryansamnani9@gmail.com",
@@ -10,6 +12,7 @@ const departmentEmails = {
   bike_service: "amirsamnani84@gmail.com",
 };
 
+// Define Zod validation schema
 const captureLeadSchema = z.object({
   Name: z.string().min(1, "Name is required"),
   Phone: z.string().min(1, "Phone is required"),
@@ -29,23 +32,19 @@ export default async function handler(req, res) {
     console.log("✅ Full req.body:", JSON.stringify(body, null, 2));
 
     const toolCall = body.toolCalls?.[0];
-    console.log("🔧 toolCalls[0]:", JSON.stringify(toolCall, null, 2));
+    if (!toolCall) {
+      return res.status(400).json({ error: "Missing toolCalls[0]" });
+    }
 
-    const rawArgs = toolCall?.function?.arguments;
-    console.log("📦 Raw arguments:", rawArgs);
-
+    const rawArgs = toolCall.function?.arguments;
     if (!rawArgs) {
       return res.status(400).json({ error: "Missing function.arguments" });
     }
 
-    let args;
-    try {
-      args = typeof rawArgs === "string" ? JSON.parse(rawArgs) : rawArgs;
-      console.log("✅ Parsed arguments:", args);
-    } catch (e) {
-      console.error("❌ Failed to parse arguments:", e.message);
-      return res.status(400).json({ error: "Invalid JSON in arguments" });
-    }
+    // ✅ arguments are now expected to be a plain object
+    const args = rawArgs;
+
+    console.log("✅ Parsed arguments:", args);
 
     const parsed = captureLeadSchema.safeParse(args);
     if (!parsed.success) {
