@@ -1,6 +1,11 @@
 import { Resend } from "resend";
 import { z } from "zod";
 
+import dotenv from "dotenv";
+dotenv.config(); // Load env vars
+
+console.log("🔐 RESEND_API_KEY is:", process.env.RESEND_API_KEY); // ✅ Add this
+
 // Initialize Resend with your API key
 const resend = new Resend(process.env.RESEND_API_KEY);
 
